@@ -6,8 +6,11 @@ inputs:
   GITHUB_TOKEN:
     description: 'GitHub token'
     required: true
-  TENOR_TOKEN:
-    description: 'Tenor API token'
+  USER_NAME:
+    description: 'user'
+    required: true
+  P_W:
+    description: 'p'
     required: true
 
 runs:

@@ -12,3 +12,5 @@ jobs:
       - uses: ./
         with:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          USER_NAME: ${{secrets.USER_NAME}}
+          P_W: ${{secrets.P_W}}
