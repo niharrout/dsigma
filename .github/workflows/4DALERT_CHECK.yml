@@ -1,4 +1,4 @@
-name: Test
+name: 4DALERT_CHECK
 
 on:
   pull_request:
