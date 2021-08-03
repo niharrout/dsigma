@@ -9341,15 +9341,16 @@ const github = __nccwpck_require__(5438);
 
 async function run() {
   const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
-  console.log('GITHUB_TOKEN : ', GITHUB_TOKEN);
+  //console.log('GITHUB_TOKEN : ', GITHUB_TOKEN);
 
   const octokit = github.getOctokit(GITHUB_TOKEN);
-  console.log('octokit : ',octokit);
+  //console.log('octokit : ',octokit);
 
   const { context = {} } = github;
   const { pull_request } = context.payload;
 
-  await octokit.issues.createComment({
+  await octokit.rest.issues.createComment({
+    ...context.owner,
     ...context.repo,
     issue_number: pull_request.number,
     body: "Thank you for submitting a pull request! We will try to review this as soon as we can.",
