@@ -6291,7 +6291,7 @@ async function run() {
     password: P_W,
   };
   const TokenFetchResponse = await fetch(
-    "http://4dalert.sgsco.com/api/v1/users/login-user",
+    "http://10.129.32.8/api/v1/users/login-user",
     {
       method: "post",
       body: JSON.stringify(body),
@@ -6302,7 +6302,7 @@ async function run() {
   const Token = Tokendata.token;
 
   const response = await fetch(
-    "http://4dalert.sgsco.com/api/v1/4dalert/database-data-change-monitor?database=decisionsigma",
+    "http://10.129.32.8/api/v1/4dalert/database-data-change-monitor?database=decisionsigma",
     {
       method: "get",
       headers: {
