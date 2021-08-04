@@ -9359,7 +9359,7 @@ async function run() {
   const Token = Tokendata.token;
 
   const response = await fetch(
-    "http://40.122.209.231/api/v1/4dalert/db-monitor?database=decisionsigma",
+    "http://40.122.209.231/api/v1/4dalert/database-data-change-monitor?database=decisionsigma",
     {
       method: "get",
       headers: {
@@ -9382,7 +9382,7 @@ async function run() {
     ...context.repo,
     issue_number: pull_request.number,
     body: `Thank you for submitting a pull request! We will try to review this as soon as we can.
-    \n\n ${ResonseData}`,
+    \n\n${ResonseData}`,
   });
 }
 
