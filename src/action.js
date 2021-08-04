@@ -21,7 +21,7 @@ async function run() {
   const Token = Tokendata.token;
 
   const response = await fetch(
-    "http://40.122.209.231/api/v1/4dalert/db-monitor?database=decisionsigma",
+    "http://40.122.209.231/api/v1/4dalert/database-data-change-monitor?database=decisionsigma",
     {
       method: "get",
       headers: {
