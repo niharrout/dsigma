@@ -1,0 +1,103 @@
+SELECT		
+				[JobVersionId]								= [JV].[JobVersionId],
+				[PrimaryContact_CustomerId]					= NULL,
+				[ProjectManagerLoginId]						= [PAM].[AccountManagerId],
+				JobPrimaryTeamId							= NULL,
+				[JobStageId]								= [JS].[JobStageId],
+				[JobStage]									= [JS].[JobStage],
+				[JobItemId]									= [JI].[JobItemId],
+				[ItemDueDateTime]							= [JI].[ItemDueDateTime],
+				[JobItemManagerLoginId]						= [JI].[AccountManagerLoginId],
+				[JobTaskId]									= [JT].[JobTaskId],
+				[JobTaskOperatorLoginId]					= [JTH].[JobTaskHistoryUserId] ,		
+				[IsJobTaskQC]								= CAST(CASE WHEN [PT].[ProductionTaskGroup] = 60 THEN 1 ELSE 0 END AS bit),
+
+				[EstimatedDurationHours]					= [JT].[EstimatedDuration] ,
+				[ActualDurationHours]                       = [hist].[TotalJobTaskHistoryCalendarWorkHours] ,
+				[JobTaskHistoryWithoutCalendarWorkHours]    = [hist].[TotalJobTaskHistoryWorkHours],
+				[ProjectManagerSiteId]                      = NULL ,
+				[JobItemManagerSiteId]                      = NULL ,
+				[JobTaskOperatorSiteId]	                    = NULL,
+				[ProductionTaskName]							= [PT].ProductionTaskName
+				
+				
+
+	FROM	--JobVersion-level tables:
+				[Warehouse_Staging].[MYSGSEU].[tbl_job_versions]						[JV]
+
+				--Primary Project Manager details:
+				 LEFT OUTER JOIN     ( SELECT     [X].[JobVersionId], 
+                                                  [X].[AccountManagerId]
+                                     FROM 
+			
+					                     (
+					                         SELECT [JAM].[JobVersionId],
+					                                [JAM].[AccountManagerId],
+					                               ROW_NUMBER() OVER (PARTITION BY [JAM] .[JobVersionId] ORDER BY [JAM].[JobAccountManagerId]) AS RowNum 
+					                          FROM	[Warehouse_Staging].[MYSGSEU].[tbl_job_account_managers] [JAM]  ) as X
+					                 WHERE   RowNum   = 1
+					             )	[PAM] 
+
+                         ON   [PAM] .[JobVersionId] = [JV].[JobVersionId]
+
+			-- JobStage-level tables:
+				LEFT OUTER JOIN	[Warehouse_Staging].[MYSGSEU].[tbl_job_stages]				[JS]		ON [JS].[JobVersionId] = [JV].[JobVersionId]
+
+			-- JobItem-level tables:
+				LEFT OUTER JOIN		[Warehouse_Staging].[MYSGSEU].[tbl_job_items]				[JI]		ON [JI].[JobStageId] = [JS].[JobStageId]
+
+			-- JobTask-level tables:
+				LEFT OUTER JOIN		[Warehouse_Staging].[MYSGSEU].[tbl_job_tasks]				[JT]		ON [JT].[JobItemId] = [JI].[JobItemId]
+				INNER JOIN [STG].[stgETLBatchProcessing]								[ETLBatch]  
+								ON [ETLBatch].[BatchId] = [JT].[ETL_BatchId]  -- Enabling Delta
+
+				LEFT OUTER JOIN		[Warehouse_Staging].[MYSGSEU].[tbl_production_tasks]		[PT]		ON [PT].[ProductionTaskId] = [JT].[ProductionTaskId]
+
+				LEFT OUTER JOIN 
+                                  (SELECT       
+                                                 [jth].[JobTaskId],
+                                               --[jth].[JobTaskHistoryUserId],
+                                               --CAST( [jth].[JobTaskHistoryDateTime] AS DATE) AS [JobTaskHistoryDateTime],
+                                                 SUM([jth].[JobTaskHistoryWorkHours]  ) AS  [TotalJobTaskHistoryWorkHours],
+												 SUM([jth].[JobTaskHistoryCalendarWorkHours]) AS [TotalJobTaskHistoryCalendarWorkHours] -- Added New field (03-05-2021)
+                                             FROM [Warehouse_Staging].[MYSGSEU].[tbl_job_task_history] [jth]
+                                             WHERE [jth].[JobTaskHistoryCalendarWorkHours] > 0.02
+											-- AND [jth].[JobTaskHistoryWorkHours] > 0   
+								             AND [jth].[JobTaskHistoryStatus] = 1     
+											 AND [JTH].[JobTaskHistoryDateTime] >= '20190101'
+                                             GROUP BY      [jth].[JobTaskId]
+                             	             --  [jth].[JobTaskHistoryUserId],
+                             		         -- CAST( [jth].[JobTaskHistoryDateTime] AS DATE)
+                                          ) [hist]
+		                   
+					                ON [JT].[JobTaskId]= [hist].JobTaskId  
+				 
+				 
+				LEFT OUTER JOIN ( SELECT          [X].[JobTaskId], 
+                                                  [X].[JobTaskHistoryStatus],
+								                  [X].[JobTaskHistoryUserId],
+								                  [X].[JobTaskHistoryDateTime]
+											
+                                     FROM 
+			
+					                     (
+					                         SELECT [hist].[JobTaskId], 
+					                                [hist].[JobTaskHistoryStatus],
+													[hist].[JobTaskHistoryUserId],
+													[hist].[JobTaskHistoryDateTime],
+											
+                                                ROW_NUMBER() OVER (PARTITION BY [hist].[JobTaskId] ORDER BY [hist].[JobTaskHistoryDateTime] DESC ) AS RowNum 
+					                          FROM	[Warehouse_Staging].[MYSGSEU].[tbl_job_task_history] [hist]  
+											  WHERE [hist].[JobTaskHistoryDateTime] >= '20190101'
+											-- AND [jth].[JobTaskHistoryCalendarWorkHours] > 0.02
+	                                         --AND [jth].[JobTaskHistoryWorkHours] > 0 
+	                                         --AND [jth].[JobTaskHistoryCalendarWorkHours] <> [jth].[JobTaskHistoryWorkHours]		--<<-- include only task history entries within the date range specified
+				                             --AND [hist].[JobTaskHistoryStatus] = 1												--<<-- include only task history entries where the Task Status was set to InProgress
+											 ) as X
+					                 WHERE   RowNum   = 1
+					             )	[JTH] 
+
+						 ON 	[JT].[JobTaskId] = [JTH] .[JobTaskId]
+				 WHERE [ETLBatch].[BatchStatus] = (CASE WHEN @IN_MODE = 'DELTA' THEN 'UNPROCESSED'
+											 ELSE [ETLBatch].[BatchStatus]
+											 END)
